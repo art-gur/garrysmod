@@ -105,8 +105,11 @@ function PLAYER:Spawn()
 	local col = self.Player:GetInfo( "cl_playercolor" )
 	self.Player:SetPlayerColor( Vector( col ) )
 
-	local col = self.Player:GetInfo( "cl_weaponcolor" )
-	self.Player:SetWeaponColor( Vector( col ) )
+	local col = Vector( self.Player:GetInfo( "cl_weaponcolor" ) )
+	if col:Length() == 0 then
+		col = Vector( 0.001, 0.001, 0.001 )
+	end
+	self.Player:SetWeaponColor( col )
 
 end
 
@@ -168,7 +171,7 @@ function PLAYER:FinishMove( move )
 	-- If the player has jumped this frame
 	if JUMPING then
 		-- Get their orientation
-		local forward = self.Player:EyeAngles()
+		local forward = move:GetAngles()
 		forward.p = 0
 		forward = forward:Forward()
 		
@@ -189,7 +192,7 @@ function PLAYER:FinishMove( move )
 		end
 		
 		-- Reverse it if the player is running backwards
-		if move:GetForwardSpeed() < 0 then
+		if move:GetVelocity():Dot(forward) < 0 then
 			speedAddition = -speedAddition
 		end
 		

@@ -1,5 +1,7 @@
 ---- Voicechat popup, radio commands, text chat stuff
 
+DEFINE_BASECLASS("gamemode_base")
+
 local GetTranslation = LANG.GetTranslation
 local GetPTranslation = LANG.GetParamTranslation
 local string = string
@@ -58,15 +60,7 @@ function GM:ChatText(idx, name, text, type)
       end
    end
 
-   if idx == 0 and type == "none" then
-      if string.sub(text, 1, 6) == "(VOTE)" then
-         chat.AddText(Color(255, 180, 0), string.sub(text, 8))
-
-         return true
-      end
-   end
-
-   return self.BaseClass:ChatText(idx, name, text, type)
+   return BaseClass.ChatText(self, idx, name, text, type)
 end
 
 
@@ -78,12 +72,25 @@ local function AddDetectiveText(ply, text)
                 ": " .. text)
 end
 
-function GM:OnPlayerChat( ply, text, teamchat, dead )
-   if IsValid(ply) and ply:IsActiveDetective() then
+function GM:OnPlayerChat(ply, text, teamchat, dead)
+   if not IsValid(ply) then return BaseClass.OnPlayerChat(self, ply, text, teamchat, dead) end 
+   
+   if ply:IsActiveDetective() then
       AddDetectiveText(ply, text)
       return true
    end
-   return self.BaseClass:OnPlayerChat(ply, text, teamchat, dead)
+   
+   local team = ply:Team() == TEAM_SPEC
+   
+   if team and not dead then
+      dead = true
+   end
+   
+   if teamchat and ((not team and not ply:IsSpecial()) or team) then
+      teamchat = false
+   end
+
+   return BaseClass.OnPlayerChat(self, ply, text, teamchat, dead)
 end
 
 local last_chat = ""
@@ -243,7 +250,7 @@ function RADIO:GetTargetType()
 
    local ent = trace.Entity
 
-   if ent:IsPlayer() then
+   if ent:IsPlayer() and  ent:IsTerror() then
       if ent:GetNWBool("disguised", false) then
          return "quick_disg", true
       else
@@ -261,7 +268,7 @@ end
 
 
 function RADIO.ToPrintable(target)
-   if type(target) == "string" then
+   if isstring(target) then
       return GetTranslation(target)
    elseif IsValid(target) then
       if target:IsPlayer() then
@@ -337,7 +344,7 @@ local function RadioCommand(ply, cmd, arg)
    RADIO.LastRadio.msg = text
 
    -- target is either a lang string or an entity
-   target = type(target) == "string" and target or tostring(target:EntIndex())
+   target = isstring(target) and target or tostring(target:EntIndex())
 
    RunConsoleCommand("_ttt_radio_send", msg_name, tostring(target))
 end
@@ -345,7 +352,8 @@ end
 local function RadioComplete(cmd, arg)
    local c = {}
    for k, cmd in pairs(RADIO.Commands) do
-      table.insert(c, cmd.cmd)
+      local rcmd = "ttt_radio " .. cmd.cmd
+      table.insert(c, rcmd)
    end
    return c
 end
@@ -419,9 +427,11 @@ g_VoicePanelList = nil
 -- 255 at 100
 -- 5 at 5000
 local function VoiceNotifyThink(pnl)
-   if not (ValidPanel(pnl) and LocalPlayer() and IsValid(pnl.Player)) then return end
-
-   local d = LocalPlayer():GetPos():Distance(pnl.Player:GetPos())
+   if not (IsValid(pnl) and LocalPlayer() and IsValid(pnl.ply)) then return end
+   if not (GetGlobalBool("ttt_locational_voice", false) and (not pnl.ply:IsSpec()) and (pnl.ply != LocalPlayer())) then return end
+   if LocalPlayer():IsActiveTraitor() && pnl.ply:IsActiveTraitor() then return end
+   
+   local d = LocalPlayer():GetPos():Distance(pnl.ply:GetPos())
 
    pnl:SetAlpha(math.max(-0.1 * d + 255, 15))
 end
@@ -455,6 +465,12 @@ function GM:PlayerStartVoice( ply )
    local pnl = g_VoicePanelList:Add("VoiceNotify")
    pnl:Setup(ply)
    pnl:Dock(TOP)
+   
+   local oldThink = pnl.Think
+   pnl.Think = function( self )
+                  oldThink( self )
+                  VoiceNotifyThink( self )
+               end
 
    local shade = Color(0, 0, 0, 150)
    pnl.Paint = function(s, w, h)
@@ -462,11 +478,6 @@ function GM:PlayerStartVoice( ply )
                   draw.RoundedBox(4, 0, 0, w, h, s.Color)
                   draw.RoundedBox(4, 1, 1, w-2, h-2, shade)
                end
-
-   if GetGlobalBool("ttt_locational_voice", false) and (not ply:IsSpec()) and (ply != client) then
-      pnl.Player = ply
-      pnl.Think = VoiceNotifyThink
-   end
 
    if client:IsActiveTraitor() then
       if ply == client then
@@ -476,9 +487,6 @@ function GM:PlayerStartVoice( ply )
       elseif ply:IsActiveTraitor() then
          if not ply.traitor_gvoice then
             pnl.Color = Color(200, 20, 20, 255)
-
-            -- unhook locational fade think
-            pnl.Think = nil
          end
       end
    end
@@ -545,7 +553,7 @@ local function CreateVoiceVGUI()
     g_VoicePanelList:ParentToHUD()
     g_VoicePanelList:SetPos(25, 25)
     g_VoicePanelList:SetSize(200, ScrH() - 200)
-    g_VoicePanelList:SetDrawBackground(false)
+    g_VoicePanelList:SetPaintBackground(false)
 
     MutedState = vgui.Create("DLabel")
     MutedState:SetPos(ScrW() - 200, ScrH() - 50)
@@ -557,15 +565,12 @@ local function CreateVoiceVGUI()
 end
 hook.Add( "InitPostEntity", "CreateVoiceVGUI", CreateVoiceVGUI )
 
-MUTE_NONE = 0
-MUTE_TERROR = TEAM_TERROR
-MUTE_SPEC = TEAM_SPEC
-
-local MuteStates = {MUTE_NONE, MUTE_TERROR, MUTE_SPEC}
+local MuteStates = {MUTE_NONE, MUTE_TERROR, MUTE_ALL, MUTE_SPEC}
 
 local MuteText = {
    [MUTE_NONE]   = "",
    [MUTE_TERROR] = "mute_living",
+   [MUTE_ALL]    = "mute_all",
    [MUTE_SPEC]   = "mute_specs"
 };
 

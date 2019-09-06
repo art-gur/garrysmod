@@ -1,49 +1,49 @@
-
 ---- Carry weapon SWEP
 
 AddCSLuaFile()
 
-SWEP.HoldType           = "pistol"
+DEFINE_BASECLASS "weapon_tttbase"
+
+SWEP.HoldType               = "pistol"
 
 if CLIENT then
-   SWEP.PrintName       = "magnet_name"
-   SWEP.Slot            = 4
+   SWEP.PrintName           = "magnet_name"
+   SWEP.Slot                = 4
+
+   SWEP.DrawCrosshair       = false
+   SWEP.ViewModelFlip       = false
 end
 
-SWEP.Base = "weapon_tttbase"
+SWEP.Base                   = "weapon_tttbase"
 
-SWEP.AutoSpawnable      = false
+SWEP.AutoSpawnable          = false
 
-SWEP.ViewModel          = Model("models/weapons/v_stunbaton.mdl")
-SWEP.WorldModel         = Model("models/weapons/w_stunbaton.mdl")
+SWEP.ViewModel              = Model("models/weapons/v_stunbaton.mdl")
+SWEP.WorldModel             = Model("models/weapons/w_stunbaton.mdl")
 
-SWEP.DrawCrosshair      = false
-SWEP.ViewModelFlip      = false
 SWEP.Primary.ClipSize       = -1
 SWEP.Primary.DefaultClip    = -1
 SWEP.Primary.Automatic      = true
-SWEP.Primary.Ammo       = "none"
-SWEP.Primary.Delay = 0.1
+SWEP.Primary.Ammo           = "none"
+SWEP.Primary.Delay          = 0.1
 
 SWEP.Secondary.ClipSize     = -1
 SWEP.Secondary.DefaultClip  = -1
 SWEP.Secondary.Automatic    = true
-SWEP.Secondary.Ammo     = "none"
-SWEP.Secondary.Delay = 0.1
+SWEP.Secondary.Ammo         = "none"
+SWEP.Secondary.Delay        = 0.1
 
-SWEP.Kind = WEAPON_CARRY
+SWEP.Kind                   = WEAPON_CARRY
+SWEP.InLoadoutFor           = {ROLE_INNOCENT, ROLE_TRAITOR, ROLE_DETECTIVE}
 
-SWEP.InLoadoutFor = {ROLE_INNOCENT, ROLE_TRAITOR, ROLE_DETECTIVE}
+SWEP.AllowDelete            = false
+SWEP.AllowDrop              = false
+SWEP.NoSights               = true
 
-SWEP.AllowDelete = false
-SWEP.AllowDrop = false
-
-SWEP.NoSights = true
-
-SWEP.EntHolding = nil
-SWEP.CarryHack = nil
-SWEP.Constr = nil
-SWEP.PrevOwner = nil
+SWEP.EntHolding             = nil
+SWEP.CarryHack              = nil
+SWEP.Constr                 = nil
+SWEP.PrevOwner              = nil
 
 local allow_rag  = CreateConVar("ttt_ragdoll_carrying", "1")
 local prop_force = CreateConVar("ttt_prop_carrying_force", "60000")
@@ -54,7 +54,7 @@ local pin_rag_inno = CreateConVar("ttt_ragdoll_pinning_innocents", "0")
 -- Allowing weapon pickups can allow players to cause a crash in the physics
 -- system (ie. not fixable). Tuning the range seems to make this more
 -- difficult. Not sure why. It's that kind of crash.
-local allow_wep = CreateConVar("ttt_weapon_carrying", "1")
+local allow_wep = CreateConVar("ttt_weapon_carrying", "0")
 local wep_range = CreateConVar("ttt_weapon_carrying_range", "50")
 
 -- not customizable via convars as some objects rely on not being carryable for
@@ -103,10 +103,14 @@ function SWEP:Reset(keep_velocity)
    end
 
    if IsValid(self.EntHolding) then
-      if not IsValid(self.PrevOwner) then
-         self.EntHolding:SetOwner(nil)
-      else
-         self.EntHolding:SetOwner(self.PrevOwner)
+      -- it is possible for weapons to be already equipped at this point
+      -- changing the owner in such a case would cause problems
+      if not self.EntHolding:IsWeapon() then
+         if not IsValid(self.PrevOwner) then
+            self.EntHolding:SetOwner(nil)
+         else
+            self.EntHolding:SetOwner(self.PrevOwner)
+         end
       end
 
       -- the below ought to be unified with self:Drop()
@@ -165,6 +169,7 @@ local ent_diff_time = CurTime()
 
 local stand_time = 0
 function SWEP:Think()
+   BaseClass.Think(self)
    if not self:CheckValidity() then return end
 
    -- If we are too far from our object, force a drop. To avoid doing this
@@ -191,9 +196,9 @@ function SWEP:Think()
       stand_time = CurTime() + 0.1
    end
 
-   self.CarryHack:SetPos(self.Owner:EyePos() + self.Owner:GetAimVector() * 70)
+   self.CarryHack:SetPos(self:GetOwner():EyePos() + self:GetOwner():GetAimVector() * 70)
 
-   self.CarryHack:SetAngles(self.Owner:GetAngles())
+   self.CarryHack:SetAngles(self:GetOwner():GetAngles())
 
    self.EntHolding:PhysWake()
 end
@@ -274,7 +279,7 @@ function SWEP:DoAttack(pickup)
       return
    end
 
-   local ply = self.Owner
+   local ply = self:GetOwner()
 
    local trace = ply:GetEyeTrace(MASK_SHOT)
    if IsValid(trace.Entity) then
@@ -342,7 +347,7 @@ end
 function SWEP:Pickup()
    if CLIENT or IsValid(self.EntHolding) then return end
 
-   local ply = self.Owner
+   local ply = self:GetOwner()
    local trace = ply:GetEyeTrace(MASK_SHOT)
    local ent = trace.Entity
    self.EntHolding = ent
@@ -365,14 +370,20 @@ function SWEP:Pickup()
          self.CarryHack:SetOwner(ply)
          self.CarryHack:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
          self.CarryHack:SetSolid(SOLID_NONE)
+         
+         -- set the desired angles before adding the constraint
+         self.CarryHack:SetAngles(self:GetOwner():GetAngles())
 
          self.CarryHack:Spawn()
 
          -- if we already are owner before pickup, we will not want to disown
          -- this entity when we drop it
-         self.PrevOwner = self.EntHolding:GetOwner()
+         -- weapons should not have their owner changed in this way
+         if not self.EntHolding:IsWeapon() then
+            self.PrevOwner = self.EntHolding:GetOwner()
 
-         self.EntHolding:SetOwner(ply)
+            self.EntHolding:SetOwner(ply)
+         end
 
          local phys = self.CarryHack:GetPhysicsObject()
          if IsValid(phys) then
@@ -406,7 +417,7 @@ end
 
 local down = Vector(0, 0, -1)
 function SWEP:AllowEntityDrop()
-   local ply = self.Owner
+   local ply = self:GetOwner()
    local ent = self.CarryHack
    if (not IsValid(ply)) or (not IsValid(ent)) then return false end
 
@@ -435,7 +446,7 @@ function SWEP:Drop()
          phys:EnableDrag(true)
          phys:EnableMotion(true)
          phys:Wake()
-         phys:ApplyForceCenter(self.Owner:GetAimVector() * 500)
+         phys:ApplyForceCenter(self:GetOwner():GetAimVector() * 500)
 
          phys:ClearGameFlag(FVPHYSICS_PLAYER_HELD)
          phys:AddGameFlag(FVPHYSICS_WAS_THROWN)
@@ -446,7 +457,7 @@ function SWEP:Drop()
          KillVelocity(ent)
       end
 
-      ent:SetPhysicsAttacker(self.Owner)
+      ent:SetPhysicsAttacker(self:GetOwner())
 
    end
 
@@ -469,10 +480,10 @@ end
 
 function SWEP:PinRagdoll()
    if not pin_rag:GetBool() then return end
-   if (not self.Owner:IsTraitor()) and (not pin_rag_inno:GetBool()) then return end
+   if (not self:GetOwner():IsTraitor()) and (not pin_rag_inno:GetBool()) then return end
 
    local rag = self.EntHolding
-   local ply = self.Owner
+   local ply = self:GetOwner()
 
    local tr = util.TraceLine({start  = ply:EyePos(),
                               endpos = ply:EyePos() + (ply:GetAimVector() * PIN_RAG_RANGE),
@@ -568,16 +579,18 @@ if CLIENT then
    function SWEP:DrawHUD()
       self.BaseClass.DrawHUD(self)
 
-      if self.dt.can_rag_pin and IsValid(self.dt.carried_rag) and LocalPlayer():IsTraitor() then
+      if self.dt.can_rag_pin and IsValid(self.dt.carried_rag) then
          local client = LocalPlayer()
 
-         local tr = util.TraceLine({start  = client:EyePos(),
-                                    endpos = client:EyePos() + (client:GetAimVector() * PIN_RAG_RANGE),
-                                    filter = {client, self, self.dt.carried_rag},
-                                    mask   = MASK_SOLID})
+         if not client:IsSpec() and client:IsTraitor() then
+            local tr = util.TraceLine({start  = client:EyePos(),
+               endpos = client:EyePos() + (client:GetAimVector() * PIN_RAG_RANGE),
+               filter = {client, self, self.dt.carried_rag},
+               mask   = MASK_SOLID})
 
-         if tr.HitWorld and (not tr.HitSky) then
-            draw.SimpleText(PT("magnet_help", key_params), "TabLarge", ScrW() / 2, ScrH() / 2 - 50, COLOR_RED, TEXT_ALIGN_CENTER)
+            if tr.HitWorld and (not tr.HitSky) then
+               draw.SimpleText(PT("magnet_help", key_params), "TabLarge", ScrW() / 2, ScrH() / 2 - 50, COLOR_RED, TEXT_ALIGN_CENTER)
+            end
          end
       end
    end

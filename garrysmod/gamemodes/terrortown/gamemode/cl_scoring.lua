@@ -63,7 +63,7 @@ function CLSCORE.DeclareEventDisplay(event_id, event_fns)
    if not tonumber(event_id) then
       Error("Event ??? display: invalid event id\n")
    end
-   if (not event_fns) or type(event_fns) != "table" then
+   if (not event_fns) or not istable(event_fns) then
       Error(Format("Event %d display: no display functions found.\n", event_id))
    end
    if not event_fns.text then
@@ -136,8 +136,6 @@ function CLSCORE:BuildScorePanel(dpanel)
    dlist:SetSize(w, h)
    dlist:SetSortable(true)
    dlist:SetMultiSelect(false)
-   dlist:SetPaintBackground(false)
-   dlist:SetDrawBackground(false)
 
    local colnames = {"", "col_player", "col_role", "col_kills1", "col_kills2", "col_points", "col_team", "col_total"}
    for k, name in pairs(colnames) do
@@ -427,7 +425,7 @@ function CLSCORE:ClearPanel()
       -- we need this hack as opposed to just calling Remove because gmod does
       -- not offer a means of killing the tooltip, and doesn't clean it up
       -- properly on Remove
-      gui.SetMousePos( ScrW()/2, ScrH()/2 )
+      input.SetCursorPos( ScrW()/2, ScrH()/2 )
       local pnl = self.Panel
       timer.Simple(0, function() pnl:Remove() end)
    end
@@ -498,8 +496,8 @@ function CLSCORE:Init(events)
    local nicks = {}
    for k, e in pairs(events) do
       if e.id == EVENT_SPAWN then
-         scores[e.uid] = ScoreInit()
-         nicks[e.uid] = e.ni
+         scores[e.sid] = ScoreInit()
+         nicks[e.sid] = e.ni
       end
    end
 
@@ -520,9 +518,9 @@ function CLSCORE:ReportEvents(events)
    self:ShowPanel()
 end
 
-function CLSCORE:Reopen()
-   if self.Panel and self.Panel:IsValid() and not self.Panel:IsVisible() then
-      self.Panel:SetVisible(true)
+function CLSCORE:Toggle()
+   if IsValid(self.Panel) then
+      self.Panel:ToggleVisible()
    end
 end
 

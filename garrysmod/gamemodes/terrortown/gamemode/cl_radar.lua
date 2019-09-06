@@ -36,7 +36,7 @@ end
 function RADAR:Timeout()
    self:EndScan()
 
-   if self.repeating and LocalPlayer() and (LocalPlayer():IsActiveTraitor() or LocalPlayer():IsActiveDetective()) then
+   if self.repeating and LocalPlayer() and LocalPlayer():IsActiveSpecial() and LocalPlayer():HasEquipmentItem(EQUIP_RADAR) then
       RunConsoleCommand("ttt_radar_scan")
    end
 end
@@ -74,6 +74,8 @@ local function DrawTarget(tgt, size, offset, no_shrink)
 
    scrpos.x = math.Clamp(scrpos.x, sz, ScrW() - sz)
    scrpos.y = math.Clamp(scrpos.y, sz, ScrH() - sz)
+   
+   if IsOffScreen(scrpos) then return end
 
    surface.DrawTexturedRect(scrpos.x - sz, scrpos.y - sz, sz * 2, sz * 2)
 
@@ -167,6 +169,9 @@ function RADAR:Draw(client)
       alpha = alpha_base
 
       scrpos = tgt.pos:ToScreen()
+      if not scrpos.visible then
+         continue
+      end
       md = mpos:Distance(Vector(scrpos.x, scrpos.y, 0))
       if md < near_cursor_dist then
          alpha = math.Clamp(alpha * (md / near_cursor_dist), 40, 230)
@@ -181,7 +186,7 @@ function RADAR:Draw(client)
          surface.SetDrawColor(0, 0, 255, alpha)
          surface.SetTextColor(0, 0, 255, alpha)
 
-      elseif role == -1 then -- decoys
+      elseif role == 3 then -- decoys
          surface.SetDrawColor(150, 150, 150, alpha)
          surface.SetTextColor(150, 150, 150, alpha)
 

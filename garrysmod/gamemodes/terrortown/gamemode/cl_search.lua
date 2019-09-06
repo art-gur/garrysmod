@@ -5,31 +5,21 @@ local PT = LANG.GetParamTranslation
 
 local is_dmg = util.BitSet
 
+local dtt = { search_dmg_crush = DMG_CRUSH, search_dmg_bullet = DMG_BULLET, search_dmg_fall = DMG_FALL, 
+search_dmg_boom = DMG_BLAST, search_dmg_club = DMG_CLUB, search_dmg_drown = DMG_DROWN, search_dmg_stab = DMG_SLASH, 
+search_dmg_burn = DMG_BURN, search_dmg_tele = DMG_SONIC, search_dmg_car = DMG_VEHICLE }
+
 -- "From his body you can tell XXX"
 local function DmgToText(d)
-   if is_dmg(d, DMG_CRUSH) then
-      return T("search_dmg_crush")
-   elseif is_dmg(d, DMG_BULLET) then
-      return T("search_dmg_bullet")
-   elseif is_dmg(d, DMG_FALL) then
-      return T("search_dmg_fall")
-   elseif is_dmg(d, DMG_BLAST) then
-      return T("search_dmg_boom")
-   elseif is_dmg(d, DMG_CLUB) then
-      return T("search_dmg_club")
-   elseif is_dmg(d, DMG_DROWN) then
-      return T("search_dmg_drown")
-   elseif is_dmg(d, DMG_SLASH) then
-      return T("search_dmg_stab")
-   elseif is_dmg(d, DMG_BURN) or is_dmg(d, DMG_DIRECT) then
-      return T("search_dmg_burn")
-   elseif is_dmg(d, DMG_SONIC) then
-      return T("search_dmg_tele")
-   elseif is_dmg(d, DMG_VEHICLE) then
-      return T("search_dmg_car")
-   else
-      return T("search_dmg_other")
+   for k, v in pairs(dtt) do
+      if is_dmg(d, v) then
+        return T(k)
+      end
    end
+   if is_dmg(d, DMG_DIRECT) then
+      return T("search_dmg_burn")
+   end
+   return T("search_dmg_other")
 end
 
 -- Info type to icon mapping
@@ -40,16 +30,15 @@ end
 -- Those that have a lot of possible data values are defined separately, either
 -- as a function or a table.
 
+local dtm = { bullet = DMG_BULLET, rock = DMG_CRUSH, splode = DMG_BLAST, fall = DMG_FALL, fire = DMG_BURN }
+
 local function DmgToMat(d)
-   if is_dmg(d, DMG_BULLET) then
-      return "bullet"
-   elseif is_dmg(d, DMG_CRUSH) then
-      return "rock"
-   elseif is_dmg(d, DMG_BLAST) then
-      return "splode"
-   elseif is_dmg(d, DMG_FALL) then
-      return "fall"
-   elseif is_dmg(d, DMG_BURN) or is_dmg(d, DMG_DIRECT) then
+   for k, v in pairs(dtm) do
+      if is_dmg(d, v) then
+         return k
+      end
+   end
+   if is_dmg(d, DMG_DIRECT) then
       return "fire"
    else
       return "skull"
@@ -76,16 +65,16 @@ local TypeToMat = {
    stime="wtester",
    lastid="lastid",
    kills="list"
-};
+}
 
 -- Accessor for better fail handling
 local function IconForInfoType(t, data)
    local base = "vgui/ttt/icon_"
    local mat = TypeToMat[t]
 
-   if type(mat) == "table" then
+   if istable(mat) then
       mat = mat[data]
-   elseif type(mat) == "function" then
+   elseif isfunction(mat) then
       mat = mat(data)
    end
 
@@ -231,6 +220,8 @@ function PreprocSearch(raw)
       end
    end
 
+   hook.Call("TTTBodySearchPopulate", nil, search, raw)
+
    return search
 end
 
@@ -263,7 +254,8 @@ local function ShowSearchScreen(search_raw)
 
    local m = 8
    local bw, bh = 100, 25
-   local w, h = 410, 260
+   local bw_large = 125
+   local w, h = 425, 260
 
    local rw, rh = (w - m*2), (h - 25 - m*2)
    local rx, ry = 0, 0
@@ -339,15 +331,15 @@ local function ShowSearchScreen(search_raw)
 
    local dident = vgui.Create("DButton", dcont)
    dident:SetPos(m, by)
-   dident:SetSize(bw,bh)
+   dident:SetSize(bw_large, bh)
    dident:SetText(T("search_confirm"))
    local id = search_raw.eidx + search_raw.dtime
    dident.DoClick = function() RunConsoleCommand("ttt_confirm_death", search_raw.eidx, id) end
    dident:SetDisabled(client:IsSpec() or (not client:KeyDownLast(IN_WALK)))
 
    local dcall = vgui.Create("DButton", dcont)
-   dcall:SetPos(m*2 + bw, by)
-   dcall:SetSize(bw, bh)
+   dcall:SetPos(m*2 + bw_large, by)
+   dcall:SetSize(bw_large, bh)
    dcall:SetText(T("search_call"))
    dcall.DoClick = function(s)
                       client.called_corpses = client.called_corpses or {}
@@ -381,7 +373,6 @@ local function ShowSearchScreen(search_raw)
 
       -- Certain items need a special icon conveying additional information
       if t == "nick" then
-         local name = info.nick
          local avply = IsValid(search_raw.owner) and search_raw.owner or nil
 
          ic = vgui.Create("SimpleIconAvatar", dlist)
@@ -448,7 +439,7 @@ local function ReceiveRagdollSearch()
    search.eidx = net.ReadUInt(16)
 
    search.owner = Entity(net.ReadUInt(8))
-   if not (IsValid(search.owner) and search.owner:IsPlayer() and (not search.owner:Alive())) then
+   if not (IsValid(search.owner) and search.owner:IsPlayer() and (not search.owner:IsTerror())) then
       search.owner = nil
    end
 
@@ -496,6 +487,8 @@ local function ReceiveRagdollSearch()
    --
    local words = net.ReadString()
    search.words = (words ~= "") and words or nil
+   
+   hook.Call("TTTBodySearchEquipment", nil, search, eq)
 
    if search.show then
       ShowSearchScreen(search)

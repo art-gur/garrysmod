@@ -61,7 +61,7 @@ local checkers = {
 };
 
 function ENT:GetWeaponChecker(check)
-   if type(check) == "string" then
+   if isstring(check) then
       return HasNamed(check)
    else
       return checkers[check]
@@ -106,13 +106,7 @@ function ENT:AcceptInput(name, activator, caller, data)
 
       local weapons = self:TestWeapons(weptype or wepname)
 
-      if not self.Outputs["WeaponsFound"] then return end
-
-      for idx, op in pairs(self.Outputs["WeaponsFound"]) do
-         op.param = weapons
-      end
-
-      self:TriggerOutput("WeaponsFound", activator)
+      self:TriggerOutput("WeaponsFound", activator, weapons)
 
       return true
    end

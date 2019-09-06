@@ -10,10 +10,12 @@ CreateClientConVar("ttt_avoid_detective", "0", true, true)
 
 HELPSCRN = {}
 
+local dframe
 function HELPSCRN:Show()
+   if IsValid(dframe) then return end
    local margin = 15
 
-   local dframe = vgui.Create("DFrame")
+   dframe = vgui.Create("DFrame")
    local w, h = 630, 470
    dframe:SetSize(w, h)
    dframe:Center()
@@ -92,6 +94,9 @@ function HELPSCRN:Show()
 
    cb = dgui:CheckBox(GetTranslation("set_fastsw"), "ttt_weaponswitcher_fast")
    cb:SetTooltip(GetTranslation("set_fastsw_tip"))
+      
+   cb = dgui:CheckBox(GetTranslation("set_fastsw_menu"), "ttt_weaponswitcher_displayfast")
+   cb:SetTooltip(GetTranslation("set_fastswmenu_tip"))
 
    cb = dgui:CheckBox(GetTranslation("set_wswitch"), "ttt_weaponswitcher_stay")
    cb:SetTooltip(GetTranslation("set_wswitch_tip"))

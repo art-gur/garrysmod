@@ -3,21 +3,6 @@
 
 include("sb_row.lua")
 
-local function CompareScore(pa, pb)
-   if not ValidPanel(pa) then return false end
-   if not ValidPanel(pb) then return true end
-
-   local a = pa:GetPlayer()
-   local b = pb:GetPlayer()
-
-   if not IsValid(a) then return false end
-   if not IsValid(b) then return true end
-
-   if a:Frags() == b:Frags() then return a:Deaths() < b:Deaths() end
-
-   return a:Frags() > b:Frags()
-end
-
 local PANEL = {}
 
 function PANEL:Init()
@@ -98,11 +83,8 @@ function PANEL:AddPlayerRow(ply)
       self.rows[ply] = row
       self.rowcount = table.Count(self.rows)
 
---      row:InvalidateLayout()
-
       -- must force layout immediately or it takes its sweet time to do so
       self:PerformLayout()
-      --self:InvalidateLayout()
    end
 end
 
@@ -114,20 +96,50 @@ function PANEL:HasRows()
    return self.rowcount > 0
 end
 
+local strlower = string.lower
 function PANEL:UpdateSortCache()
    self.rows_sorted = {}
-   for k,v in pairs(self.rows) do
-      table.insert(self.rows_sorted, v)
+
+   for _, row in pairs(self.rows) do
+      table.insert(self.rows_sorted, row)
    end
 
-   table.sort(self.rows_sorted, CompareScore)
+   table.sort(self.rows_sorted, function(rowa, rowb)
+      local plya = rowa:GetPlayer()
+      local plyb = rowb:GetPlayer()
+
+      if not IsValid(plya) then return false end
+      if not IsValid(plyb) then return true end
+
+      local sort_mode = GetConVar("ttt_scoreboard_sorting"):GetString()
+      local sort_func = sboard_sort[sort_mode]
+
+      local comp = 0
+      if sort_func != nil then
+         comp = sort_func(plya, plyb)
+      end
+
+      local ret = true
+
+      if comp != 0 then
+         ret = comp > 0
+      else
+         ret = strlower(plya:GetName()) > strlower(plyb:GetName())
+      end
+
+      if GetConVar("ttt_scoreboard_ascending"):GetBool() then
+         ret = not ret
+      end
+
+      return ret
+   end)
 end
 
 function PANEL:UpdatePlayerData()
    local to_remove = {}
    for k,v in pairs(self.rows) do
       -- Player still belongs in this group?
-      if ValidPanel(v) and IsValid(v:GetPlayer()) and ScoreGroup(v:GetPlayer()) == self.group then
+      if IsValid(v) and IsValid(v:GetPlayer()) and ScoreGroup(v:GetPlayer()) == self.group then
          v:UpdatePlayerData()
       else
          -- can't remove now, will break pairs
@@ -139,11 +151,9 @@ function PANEL:UpdatePlayerData()
 
    for k,ply in pairs(to_remove) do
       local pnl = self.rows[ply]
-      if ValidPanel(pnl) then
+      if IsValid(pnl) then
          pnl:Remove()
       end
-
---      print(CurTime(), "Removed player", ply)
 
       self.rows[ply] = nil
    end

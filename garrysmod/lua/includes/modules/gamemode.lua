@@ -1,33 +1,26 @@
 
-require( "hook" )
-
--- Globals that we need 
-local gmod 			= gmod
-local pairs 		= pairs
-local Msg 			= Msg
-local hook 			= hook
+local gmod			= gmod
+local Msg			= Msg
+local hook			= hook
 local table			= table
-local MsgN			= MsgN
-local PrintTable	= PrintTable
 local baseclass		= baseclass
 
-
 --[[---------------------------------------------------------
-   Name: gamemode
-   Desc: A module to manage gamemodes
+	Name: gamemode
+	Desc: A module to manage gamemodes
 -----------------------------------------------------------]]
 module( "gamemode" )
 
 local GameList = {}
 
 --[[---------------------------------------------------------
-   Name: RegisterGamemode( table, string )
-   Desc: Used to register your gamemode with the engine
+	Name: RegisterGamemode( table, string )
+	Desc: Used to register your gamemode with the engine
 -----------------------------------------------------------]]
 function Register( t, name, derived )
 
 	local CurrentGM = gmod.GetGamemode()
-	
+
 	if ( CurrentGM ) then
 
 		if ( CurrentGM.FolderName == name ) then
@@ -67,25 +60,24 @@ function Register( t, name, derived )
 end
 
 --[[---------------------------------------------------------
-   Name: Get( string )
-   Desc: Get a gamemode by name.
+	Name: Get( string )
+	Desc: Get a gamemode by name.
 -----------------------------------------------------------]]
 function Get( name )
 	return GameList[ name ]
 end
 
 --[[---------------------------------------------------------
-   Name: Call( name, args )
-   Desc: Calls a gamemode function
+	Name: Call( name, args )
+	Desc: Calls a gamemode function
 -----------------------------------------------------------]]
 function Call( name, ... )
 
 	local CurrentGM = gmod.GetGamemode()
-	
+
 	-- If the gamemode function doesn't exist just return false
 	if ( CurrentGM && CurrentGM[name] == nil ) then return false end
-	
-	return hook.Call( name, CurrentGM, ... )
-	
-end
 
+	return hook.Call( name, CurrentGM, ... )
+
+end

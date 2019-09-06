@@ -1,51 +1,48 @@
-
 -- traitor equipment: teleporter
 
 AddCSLuaFile()
 
-SWEP.HoldType = "normal"
+SWEP.HoldType              = "normal"
 
 if CLIENT then
-   SWEP.PrintName = "tele_name"
-   SWEP.Slot = 7
+   SWEP.PrintName          = "tele_name"
+   SWEP.Slot               = 7
 
-   SWEP.ViewModelFOV = 10
+   SWEP.ViewModelFlip      = false
+   SWEP.ViewModelFOV       = 10
+   SWEP.DrawCrosshair      = false
+   SWEP.CSMuzzleFlashes    = false
 
    SWEP.EquipMenuData = {
       type = "item_weapon",
       desc = "tele_desc"
    };
 
-   SWEP.Icon = "vgui/ttt/icon_tport"
+   SWEP.Icon               = "vgui/ttt/icon_tport"
 end
 
-SWEP.Base = "weapon_tttbase"
+SWEP.Base                  = "weapon_tttbase"
 
-SWEP.ViewModel          = "models/weapons/v_crowbar.mdl"
-SWEP.WorldModel         = "models/weapons/w_slam.mdl"
+SWEP.ViewModel             = "models/weapons/v_crowbar.mdl"
+SWEP.WorldModel            = "models/weapons/w_slam.mdl"
 
-SWEP.DrawCrosshair      = false
-SWEP.ViewModelFlip      = false
-SWEP.Primary.ClipSize    = 16
-SWEP.Primary.DefaultClip = 16
-SWEP.Primary.ClipMax     = 16
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = "GaussEnergy"
-SWEP.Primary.Delay = 0.5
+SWEP.Primary.ClipSize      = 16
+SWEP.Primary.DefaultClip   = 16
+SWEP.Primary.ClipMax       = 16
+SWEP.Primary.Automatic     = false
+SWEP.Primary.Ammo          = "GaussEnergy"
+SWEP.Primary.Delay         = 0.5
 
-SWEP.Secondary.Automatic = false
-SWEP.Secondary.Ammo = "none"
-SWEP.Secondary.Delay = 1.0
+SWEP.Secondary.Automatic   = false
+SWEP.Secondary.Ammo        = "none"
+SWEP.Secondary.Delay       = 1.0
 
-SWEP.Kind = WEAPON_EQUIP2
-SWEP.CanBuy = {ROLE_TRAITOR, ROLE_DETECTIVE}
-SWEP.WeaponID = AMMO_TELEPORT
+SWEP.Kind                  = WEAPON_EQUIP2
+SWEP.CanBuy                = {ROLE_TRAITOR, ROLE_DETECTIVE}
+SWEP.WeaponID              = AMMO_TELEPORT
 
-
-SWEP.AllowDrop = true
-SWEP.NoSights = true
-
-SWEP.CSMuzzleFlashes = false
+SWEP.AllowDrop             = true
+SWEP.NoSights              = true
 
 local delay_beamup = 1
 local delay_beamdown = 1
@@ -89,13 +86,14 @@ end
 local zap = Sound("ambient/levels/labs/electric_explosion4.wav")
 local unzap = Sound("ambient/levels/labs/electric_explosion2.wav")
 
-local function Telefrag(victim, attacker)
+local function Telefrag(victim, attacker, weapon)
    if not IsValid(victim) then return end
 
    local dmginfo = DamageInfo()
    dmginfo:SetDamage(5000)
    dmginfo:SetDamageType(DMG_SONIC)
    dmginfo:SetAttacker(attacker)
+   dmginfo:SetInflictor(weapon)
    dmginfo:SetDamageForce(Vector(0,0,10))
    dmginfo:SetDamagePosition(attacker:GetPos())
 
@@ -197,7 +195,7 @@ local function CanTeleportToPos(ply, pos)
    return false, nil
 end
 
-local function DoTeleport(ply, teleport)
+local function DoTeleport(ply, teleport, weapon)
    if IsValid(ply) and ply:IsTerror() and teleport then
       local fail = false
 
@@ -210,7 +208,7 @@ local function DoTeleport(ply, teleport)
          -- if blocked by player, maybe telefrag
          if ttt_telefrags:GetBool() then
             for _, p in pairs(block_plys) do
-               Telefrag(p, ply)
+               Telefrag(p, ply, weapon)
             end
          else
             fail = true
@@ -230,13 +228,13 @@ local function DoTeleport(ply, teleport)
    end
 end
 
-local function StartTeleport(ply, teleport)
+local function StartTeleport(ply, teleport, weapon)
    if (not IsValid(ply)) or (not ply:IsTerror()) or (not teleport) then
       return end
 
    teleport.ang = ply:EyeAngles()
 
-   timer.Simple(delay_beamup, function() DoTeleport(ply, teleport) end)
+   timer.Simple(delay_beamup, function() DoTeleport(ply, teleport, weapon) end)
 
    local ang = ply:GetAngles()
 
@@ -261,8 +259,8 @@ local function StartTeleport(ply, teleport)
    util.Effect("teleport_beamdown", edata_dn)
 end
 
-function SWEP:TeleportRecall(ply)
-   local ply = self.Owner
+function SWEP:TeleportRecall()
+   local ply = self:GetOwner()
    if IsValid(ply) and ply:IsTerror() then
       local mark = self:GetTeleportMark()
       if mark then
@@ -282,7 +280,7 @@ function SWEP:TeleportRecall(ply)
 
          self:TakePrimaryAmmo(1)
 
-         timer.Simple(0.2, function() StartTeleport(ply, mark) end)
+         timer.Simple(0.2, function() StartTeleport(ply, mark, self) end)
       else
          LANG.Msg(ply, "tele_no_mark")
       end
@@ -301,7 +299,7 @@ local function CanStoreTeleportPos(ply, pos)
 end
 
 function SWEP:TeleportStore()
-   local ply = self.Owner
+   local ply = self:GetOwner()
    if IsValid(ply) and ply:IsTerror() then
 
       local allow, msg = CanStoreTeleportPos(ply, self:GetPos())
@@ -332,8 +330,8 @@ if CLIENT then
 end
 
 function SWEP:Deploy()
-   if SERVER and IsValid(self.Owner) then
-      self.Owner:DrawViewModel(false)
+   if SERVER and IsValid(self:GetOwner()) then
+      self:GetOwner():DrawViewModel(false)
    end
 
    return true

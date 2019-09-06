@@ -183,7 +183,7 @@ local function PointsAroundSpawn(spwn)
 end
 
 function GM:PlayerSelectSpawn(ply)
-   if (not self.SpawnPoints) or (table.Count(self.SpawnPoints) == 0) or (not IsTableOfEntitiesValid(self.SpawnPoints)) then
+   if (not self.SpawnPoints) or (table.IsEmpty(self.SpawnPoints)) or (not IsTableOfEntitiesValid(self.SpawnPoints)) then
 
       self.SpawnPoints = GetSpawnEnts(true, false)
 
@@ -194,8 +194,7 @@ function GM:PlayerSelectSpawn(ply)
       -- ones anyway.
    end
 
-   local num = table.Count(self.SpawnPoints)
-   if num == 0 then
+   if table.IsEmpty(self.SpawnPoints) then
       Error("No spawn entity found!\n")
       return
    end
@@ -259,14 +258,13 @@ end
 
 function GM:TTTPlayerSetColor(ply)
    local clr = COLOR_WHITE
-   local should_color = hook.Call("TTTShouldColorModel", GAMEMODE, ply:GetModel())
-   if GAMEMODE.playercolor and should_color then
+   if GAMEMODE.playercolor then
       -- If this player has a colorable model, always use the same color as all
       -- other colorable players, so color will never be the factor that lets
       -- you tell players apart.
       clr = GAMEMODE.playercolor
    end
-   ply:SetColor(clr)
+   ply:SetPlayerColor( Vector( clr.r/255.0, clr.g/255.0, clr.b/255.0 ) )
 end
 
 
@@ -317,6 +315,7 @@ function GM:KeyPress(ply, key)
       if key == IN_ATTACK then
          -- snap to random guy
          ply:Spectate(OBS_MODE_ROAMING)
+         ply:SetEyeAngles(angle_zero) -- After exiting propspec, this could be set to awkward values
          ply:SpectateEntity(nil)
 
          local alive = util.GetAlivePlayers()
@@ -326,6 +325,7 @@ function GM:KeyPress(ply, key)
          local target = table.Random(alive)
          if IsValid(target) then
             ply:SetPos(target:EyePos())
+            ply:SetEyeAngles(target:EyeAngles())
          end
       elseif key == IN_ATTACK2 then
          -- spectate either the next guy or a random guy in chase
@@ -402,14 +402,6 @@ function GM:KeyRelease(ply, key)
       end
    end
 
-end
-
-function GM:PlayerButtonUp(ply, btn)
-   -- Would be nice to clean up this whole "all key handling in massive
-   -- functions" thing. oh well
-   if btn == KEY_PAD_ENTER then
-      WEPS.DisguiseToggle(ply)
-   end
 end
 
 -- Normally all dead players are blocked from IN_USE on the server, meaning we
@@ -681,7 +673,7 @@ function GM:PlayerDeath( victim, infl, attacker)
 
    victim:Extinguish()
 
-   net.Start("TTT_PlayerDied") net.Send(ply)
+   net.Start("TTT_PlayerDied") net.Send(victim)
 
    if HasteMode() and GetRoundState() == ROUND_ACTIVE then
       IncRoundEnd(GetConVar("ttt_haste_minutes_per_death"):GetFloat() * 60)
@@ -799,7 +791,7 @@ end
 -- rather high drop already. Hence we do our own fall damage handling in
 -- OnPlayerHitGround.
 function GM:GetFallDamage(ply, speed)
-   return 1
+   return 0
 end
 
 local fallsounds = {
@@ -932,6 +924,8 @@ function GM:PlayerTakeDamage(ent, infl, att, amount, dmginfo)
          -- barrel bangs can hurt us even if we threw them, but that's our fault
       elseif hurter and ent == hurter:GetPhysicsAttacker() and dmginfo:IsDamageType(DMG_BLAST) then
          owner = ent
+      elseif hurter and hurter:IsVehicle() and IsValid(hurter:GetDriver()) then
+         owner = hurter:GetDriver()
       end
 
 
@@ -1093,14 +1087,6 @@ function GM:Tick()
             end
          else
             ply.drowning = nil
-         end
-
-         -- Slow down ironsighters
-         local wep = ply:GetActiveWeapon()
-         if IsValid(wep) and wep.GetIronsights and wep:GetIronsights() then
-            ply:SetSpeed(true)
-         else
-            ply:SetSpeed(false)
          end
 
          -- Run DNA Scanner think also when it is not deployed

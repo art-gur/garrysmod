@@ -73,7 +73,7 @@ local function PreqLabels(parent, x, y)
    local tbl = {}
 
    tbl.credits = vgui.Create("DLabel", parent)
-   tbl.credits:SetToolTip(GetTranslation("equip_help_cost"))
+   tbl.credits:SetTooltip(GetTranslation("equip_help_cost"))
    tbl.credits:SetPos(x, y)
    tbl.credits.Check = function(s, sel)
                           local credits = LocalPlayer():GetCredits()
@@ -81,7 +81,7 @@ local function PreqLabels(parent, x, y)
                        end
 
    tbl.owned = vgui.Create("DLabel", parent)
-   tbl.owned:SetToolTip(GetTranslation("equip_help_carry"))
+   tbl.owned:SetTooltip(GetTranslation("equip_help_carry"))
    tbl.owned:CopyPos(tbl.credits)
    tbl.owned:MoveBelow(tbl.credits, y)
    tbl.owned.Check = function(s, sel)
@@ -95,7 +95,7 @@ local function PreqLabels(parent, x, y)
                      end
 
    tbl.bought = vgui.Create("DLabel", parent)
-   tbl.bought:SetToolTip(GetTranslation("equip_help_stock"))
+   tbl.bought:SetTooltip(GetTranslation("equip_help_stock"))
    tbl.bought:CopyPos(tbl.owned)
    tbl.bought:MoveBelow(tbl.owned, y)
    tbl.bought.Check = function(s, sel)
@@ -157,13 +157,13 @@ local function TraitorMenuPopup()
    end
 
    -- Close any existing traitor menu
-   if eqframe and ValidPanel(eqframe) then eqframe:Close() end
+   if eqframe and IsValid(eqframe) then eqframe:Close() end
 
    local credits = ply:GetCredits()
    local can_order = credits > 0
 
    local dframe = vgui.Create("DFrame")
-   local w, h = 500, 350
+   local w, h = 570, 412
    dframe:SetSize(w, h)
    dframe:Center()
    dframe:SetTitle(GetTranslation("equip_title"))
@@ -209,7 +209,7 @@ local function TraitorMenuPopup()
    --- Construct icon listing
    local dlist = vgui.Create("EquipSelect", dequip)
    dlist:SetPos(0,0)
-   dlist:SetSize(154, h - 75)
+   dlist:SetSize(216, h - 75)
    dlist:EnableVerticalScrollbar(true)
    dlist:EnableHorizontal(true)
    dlist:SetPadding(4)
@@ -293,7 +293,7 @@ local function TraitorMenuPopup()
       dlist:AddPanel(ic)
    end
 
-   local dlistw = 154
+   local dlistw = 216
 
    local bw, bh = 100, 25
 
@@ -343,30 +343,32 @@ local function TraitorMenuPopup()
    dconfirm:SetText(GetTranslation("equip_confirm"))
 
 
-   dsheet:AddSheet(GetTranslation("equip_tabtitle"), dequip, "icon16/bomb.png", false, false, "Traitor equipment menu")
+   dsheet:AddSheet(GetTranslation("equip_tabtitle"), dequip, "icon16/bomb.png", false, false, GetTranslation("equip_tooltip_main"))
 
    -- Item control
    if ply:HasEquipmentItem(EQUIP_RADAR) then
       local dradar = RADAR.CreateMenu(dsheet, dframe)
-      dsheet:AddSheet(GetTranslation("radar_name"), dradar, "icon16/magnifier.png", false,false, "Radar control")
+      dsheet:AddSheet(GetTranslation("radar_name"), dradar, "icon16/magnifier.png", false, false, GetTranslation("equip_tooltip_radar"))
    end
 
    if ply:HasEquipmentItem(EQUIP_DISGUISE) then
       local ddisguise = DISGUISE.CreateMenu(dsheet)
-      dsheet:AddSheet(GetTranslation("disg_name"), ddisguise, "icon16/user.png", false,false, "Disguise control")
+      dsheet:AddSheet(GetTranslation("disg_name"), ddisguise, "icon16/user.png", false, false, GetTranslation("equip_tooltip_disguise"))
    end
 
    -- Weapon/item control
    if IsValid(ply.radio) or ply:HasWeapon("weapon_ttt_radio") then
       local dradio = TRADIO.CreateMenu(dsheet)
-      dsheet:AddSheet(GetTranslation("radio_name"), dradio, "icon16/transmit.png", false,false, "Radio control")
+      dsheet:AddSheet(GetTranslation("radio_name"), dradio, "icon16/transmit.png", false, false, GetTranslation("equip_tooltip_radio"))
    end
 
    -- Credit transferring
    if credits > 0 then
       local dtransfer = CreateTransferMenu(dsheet)
-      dsheet:AddSheet(GetTranslation("xfer_name"), dtransfer, "icon16/group_gear.png", false,false, "Transfer credits")
+      dsheet:AddSheet(GetTranslation("xfer_name"), dtransfer, "icon16/group_gear.png", false, false, GetTranslation("equip_tooltip_xfer"))
    end
+
+   hook.Run("TTTEquipmentTabs", dsheet)
 
 
    -- couple panelselect with info
@@ -426,7 +428,7 @@ end
 concommand.Add("ttt_cl_traitorpopup", TraitorMenuPopup)
 
 local function ForceCloseTraitorMenu(ply, cmd, args)
-   if ValidPanel(eqframe) then
+   if IsValid(eqframe) then
       eqframe:Close()
    end
 end
@@ -437,11 +439,15 @@ function GM:OnContextMenuOpen()
    if r == ROUND_ACTIVE and not (LocalPlayer():GetTraitor() or LocalPlayer():GetDetective()) then
       return
    elseif r == ROUND_POST or r == ROUND_PREP then
-      CLSCORE:Reopen()
+      CLSCORE:Toggle()
       return
    end
 
-   RunConsoleCommand("ttt_cl_traitorpopup")
+   if IsValid(eqframe) then
+      eqframe:Close()
+   else
+      RunConsoleCommand("ttt_cl_traitorpopup")
+   end
 end
 
 local function ReceiveEquipment()

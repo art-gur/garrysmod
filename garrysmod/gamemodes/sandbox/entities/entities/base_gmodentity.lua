@@ -2,53 +2,61 @@
 AddCSLuaFile()
 DEFINE_BASECLASS( "base_anim" )
 
-ENT.PrintName		= ""
-ENT.Author			= ""
-ENT.Contact			= ""
-ENT.Purpose			= ""
-ENT.Instructions	= ""
-
-ENT.Spawnable			= false
+ENT.Spawnable = false
 
 if ( CLIENT ) then
+	ENT.MaxWorldTipDistance = 256
 
-	ENT.LabelColor = Color( 255, 255, 255, 255 )
-	
 	function ENT:BeingLookedAtByLocalPlayer()
-	
-		if ( LocalPlayer():GetEyeTrace().Entity != self ) then return false end
-		if ( EyePos():Distance( self:GetPos() ) > 256 ) then return false end
-		
-		return true
-	
+		local ply = LocalPlayer()
+		if ( !IsValid( ply ) ) then return false end
+
+		local view = ply:GetViewEntity()
+		local dist = self.MaxWorldTipDistance
+		dist = dist * dist
+
+		-- If we're spectating a player, perform an eye trace
+		if ( view:IsPlayer() ) then
+			return view:EyePos():DistToSqr( self:GetPos() ) <= dist && view:GetEyeTrace().Entity == self
+		end
+
+		-- If we're not spectating a player, perform a manual trace from the entity's position
+		local pos = view:GetPos()
+
+		if ( pos:DistToSqr( self:GetPos() ) <= dist ) then
+			return util.TraceLine( {
+				start = pos,
+				endpos = pos + ( view:GetAngles():Forward() * dist ),
+				filter = view
+			} ).Entity == self
+		end
+
+		return false
 	end
 
-end
+	function ENT:Think()
+		local text = self:GetOverlayText()
 
-function ENT:Think()
+		if ( text != "" && self:BeingLookedAtByLocalPlayer() ) then
+			AddWorldTip( self:EntIndex(), text, 0.5, self:GetPos(), self )
 
-	if ( CLIENT && self:BeingLookedAtByLocalPlayer() && self:GetOverlayText() != ""  ) then
-	
-		AddWorldTip( self:EntIndex(), self:GetOverlayText(), 0.5, self:GetPos(), self.Entity  )
-
-		halo.Add( { self }, Color( 255, 255, 255, 255 ), 1, 1, 1, true, true )
-		
+			halo.Add( { self }, color_white, 1, 1, 1, true, true )
+		end
 	end
-
 end
 
 function ENT:SetOverlayText( text )
-	self:SetNetworkedString( "GModOverlayText", text )
+	self:SetNWString( "GModOverlayText", text )
 end
 
 function ENT:GetOverlayText()
 
-	local txt = self:GetNetworkedString( "GModOverlayText" )
-	
+	local txt = self:GetNWString( "GModOverlayText" )
+
 	if ( txt == "" ) then
 		return ""
 	end
-	
+
 	if ( game.SinglePlayer() ) then
 		return txt
 	end
@@ -56,33 +64,32 @@ function ENT:GetOverlayText()
 	local PlayerName = self:GetPlayerName()
 
 	return txt .. "\n(" .. PlayerName .. ")"
-	
-end
 
+end
 
 function ENT:SetPlayer( ply )
 
-	if ( IsValid(ply) ) then
+	if ( IsValid( ply ) ) then
 
 		self:SetVar( "Founder", ply )
 		self:SetVar( "FounderIndex", ply:UniqueID() )
-	
-		self:SetNetworkedString( "FounderName", ply:Nick() )
+
+		self:SetNWString( "FounderName", ply:Nick() )
 
 	end
-	
+
 end
 
 function ENT:GetPlayer()
 
 	return self:GetVar( "Founder", NULL )
-	
+
 end
 
 function ENT:GetPlayerIndex()
 
 	return self:GetVar( "FounderIndex", 0 )
-	
+
 end
 
 function ENT:GetPlayerName()
@@ -92,6 +99,6 @@ function ENT:GetPlayerName()
 		return ply:Nick()
 	end
 
-	return self:GetNetworkedString( "FounderName" )
-	
+	return self:GetNWString( "FounderName" )
+
 end

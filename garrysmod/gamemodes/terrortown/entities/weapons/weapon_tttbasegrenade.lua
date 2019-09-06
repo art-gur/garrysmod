@@ -2,51 +2,48 @@
 
 AddCSLuaFile()
 
-SWEP.HoldReady = "grenade"
-SWEP.HoldNormal = "slam"
+DEFINE_BASECLASS "weapon_tttbase"
+
+SWEP.HoldReady             = "grenade"
+SWEP.HoldNormal            = "slam"
 
 if CLIENT then
+   SWEP.PrintName          = "Incendiary grenade"
+   SWEP.Instructions       = "Burn."
+   SWEP.Slot               = 3
 
-   SWEP.PrintName			= "Incendiary grenade"
-   SWEP.Instructions		= "Burn."
-   SWEP.Slot				= 3
-   SWEP.SlotPos			= 0
+   SWEP.ViewModelFlip      = true
+   SWEP.DrawCrosshair      = false
 
-
-   SWEP.Icon = "vgui/ttt/icon_nades"
+   SWEP.Icon               = "vgui/ttt/icon_nades"
 end
 
-SWEP.Base				= "weapon_tttbase"
+SWEP.Base                  = "weapon_tttbase"
 
-SWEP.Kind = WEAPON_NADE
+SWEP.ViewModel             = "models/weapons/v_eq_flashbang.mdl"
+SWEP.WorldModel            = "models/weapons/w_eq_flashbang.mdl"
 
-SWEP.ViewModel			= "models/weapons/v_eq_flashbang.mdl"
-SWEP.WorldModel			= "models/weapons/w_eq_flashbang.mdl"
-SWEP.Weight			= 5
+SWEP.Weight                = 5
+SWEP.AutoSwitchFrom        = true
+SWEP.NoSights              = true
 
-SWEP.ViewModelFlip = true
-SWEP.AutoSwitchFrom		= true
+SWEP.Primary.ClipSize      = -1
+SWEP.Primary.DefaultClip   = -1
+SWEP.Primary.Automatic     = false
+SWEP.Primary.Delay         = 1.0
+SWEP.Primary.Ammo          = "none"
 
-SWEP.DrawCrosshair		= false
+SWEP.Secondary.ClipSize    = -1
+SWEP.Secondary.DefaultClip = -1
+SWEP.Secondary.Automatic   = false
+SWEP.Secondary.Ammo        = "none"
 
-SWEP.Primary.ClipSize		= -1
-SWEP.Primary.DefaultClip	= -1
-SWEP.Primary.Automatic		= false
-SWEP.Primary.Delay = 1.0
-SWEP.Primary.Ammo		= "none"
-SWEP.Secondary.ClipSize		= -1
-SWEP.Secondary.DefaultClip	= -1
-SWEP.Secondary.Automatic	= false
-SWEP.Secondary.Ammo		= "none"
+SWEP.Kind                  = WEAPON_NADE
+SWEP.IsGrenade             = true
 
-SWEP.IsGrenade = true
-SWEP.NoSights = true
-
-SWEP.was_thrown = false
-
-SWEP.detonate_timer = 5
-
-SWEP.DeploySpeed = 1.5
+SWEP.was_thrown            = false
+SWEP.detonate_timer        = 5
+SWEP.DeploySpeed           = 1.5
 
 AccessorFunc(SWEP, "det_time", "DetTime")
 
@@ -73,13 +70,13 @@ end
 function SWEP:PullPin()
    if self:GetPin() then return end
 
-   local ply = self.Owner
+   local ply = self:GetOwner()
    if not IsValid(ply) then return end
 
    self:SendWeaponAnim(ACT_VM_PULLPIN)
 
-   if self.SetWeaponHoldType then
-      self:SetWeaponHoldType(self.HoldReady)
+   if self.SetHoldType then
+      self:SetHoldType(self.HoldReady)
    end
 
    self:SetPin(true)
@@ -89,7 +86,8 @@ end
 
 
 function SWEP:Think()
-   local ply = self.Owner
+   BaseClass.Think(self)
+   local ply = self:GetOwner()
    if not IsValid(ply) then return end
 
    -- pin pulled and attack loose = throw
@@ -102,7 +100,7 @@ function SWEP:Think()
          self:SendWeaponAnim(ACT_VM_THROW)
 
          if SERVER then
-            self.Owner:SetAnimation( PLAYER_ATTACK1 )
+            self:GetOwner():SetAnimation( PLAYER_ATTACK1 )
          end
       else
          -- still cooking it, see if our time is up
@@ -117,7 +115,7 @@ end
 
 
 function SWEP:BlowInFace()
-   local ply = self.Owner
+   local ply = self:GetOwner()
    if not IsValid(ply) then return end
 
    if self.was_thrown then return end
@@ -144,7 +142,7 @@ function SWEP:Throw()
    if CLIENT then
       self:SetThrowTime(0)
    elseif SERVER then
-      local ply = self.Owner
+      local ply = self:GetOwner()
       if not IsValid(ply) then return end
 
       if self.was_thrown then return end
@@ -152,27 +150,19 @@ function SWEP:Throw()
       self.was_thrown = true
 
       local ang = ply:EyeAngles()
-
-      -- don't even know what this bit is for, but SDK has it
-      -- probably to make it throw upward a bit
-      if ang.p < 90 then
-         ang.p = -10 + ang.p * ((90 + 10) / 90)
+      local src = ply:GetPos() + (ply:Crouching() and ply:GetViewOffsetDucked() or ply:GetViewOffset())+ (ang:Forward() * 8) + (ang:Right() * 10)
+      local target = ply:GetEyeTraceNoCursor().HitPos
+      local tang = (target-src):Angle() -- A target angle to actually throw the grenade to the crosshair instead of fowards
+      -- Makes the grenade go upgwards
+      if tang.p < 90 then
+         tang.p = -10 + tang.p * ((90 + 10) / 90)
       else
-         ang.p = 360 - ang.p
-         ang.p = -10 + ang.p * -((90 + 10) / 90)
+         tang.p = 360 - tang.p
+         tang.p = -10 + tang.p * -((90 + 10) / 90)
       end
-
-      local vel = math.min(800, (90 - ang.p) * 6)
-
-      local vfw = ang:Forward()
-      local vrt = ang:Right()
-      --      local vup = ang:Up()
-
-      local src = ply:GetPos() + (ply:Crouching() and ply:GetViewOffsetDucked() or ply:GetViewOffset())
-      src = src + (vfw * 8) + (vrt * 10)
-
-      local thr = vfw * vel + ply:GetVelocity()
-
+      tang.p=math.Clamp(tang.p,-90,90) -- Makes the grenade not go backwards :/
+      local vel = math.min(800, (90 - tang.p) * 6)
+      local thr = tang:Forward() * vel + ply:GetVelocity()
       self:CreateGrenade(src, Angle(0,0,0), thr, Vector(600, math.random(-1200, 1200), 0), ply)
 
       self:SetThrowTime(0)
@@ -228,8 +218,8 @@ end
 
 function SWEP:Deploy()
 
-   if self.SetWeaponHoldType then
-      self:SetWeaponHoldType(self.HoldNormal)
+   if self.SetHoldType then
+      self:SetHoldType(self.HoldNormal)
    end
 
    self:SetThrowTime(0)
@@ -252,8 +242,8 @@ function SWEP:Reload()
 end
 
 function SWEP:Initialize()
-   if self.SetWeaponHoldType then
-      self:SetWeaponHoldType(self.HoldNormal)
+   if self.SetHoldType then
+      self:SetHoldType(self.HoldNormal)
    end
 
    self:SetDeploySpeed(self.DeploySpeed)
@@ -266,7 +256,7 @@ function SWEP:Initialize()
 end
 
 function SWEP:OnRemove()
-   if CLIENT and IsValid(self.Owner) and self.Owner == LocalPlayer() and self.Owner:Alive() then
+   if CLIENT and IsValid(self:GetOwner()) and self:GetOwner() == LocalPlayer() and self:GetOwner():Alive() then
       RunConsoleCommand("use", "weapon_ttt_unarmed")
    end
 end

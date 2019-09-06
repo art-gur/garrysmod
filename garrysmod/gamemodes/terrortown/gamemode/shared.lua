@@ -1,9 +1,7 @@
 GM.Name = "Trouble in Terrorist Town"
 GM.Author = "Bad King Urgrain"
-GM.Email = "thegreenbunny@gmail.com"
 GM.Website = "ttt.badking.net"
--- Date of latest changes (YYYY-MM-DD)
-GM.Version = "2014-03-09"
+GM.Version = "shrug emoji"
 
 
 GM.Customized = false
@@ -64,6 +62,11 @@ OPEN_ROT  = 2
 OPEN_BUT  = 3
 OPEN_NOTOGGLE = 4 --movelinear
 
+-- Mute types
+MUTE_NONE = 0
+MUTE_TERROR = 1
+MUTE_ALL = 2
+MUTE_SPEC = 1002
 
 COLOR_WHITE  = Color(255, 255, 255, 255)
 COLOR_BLACK  = Color(0, 0, 0, 255)
@@ -110,15 +113,6 @@ function GetRandomPlayerModel()
    return table.Random(ttt_playermodels)
 end
 
-function GM:TTTShouldColorModel(mdl)
-   local colorable =  {
-      "models/player/phoenix.mdl",
-      "models/player/guerilla.mdl",
-      "models/player/leet.mdl"
-   };
-   return table.HasValue(colorable, mdl)
-end
-
 local ttt_playercolors = {
    all = {
       COLOR_WHITE,
@@ -147,16 +141,14 @@ local ttt_playercolors = {
 
 CreateConVar("ttt_playercolor_mode", "1")
 function GM:TTTPlayerColor(model)
-   if hook.Call("TTTShouldColorModel", GAMEMODE, model) then
-      local mode = GetConVarNumber("ttt_playercolor_mode") or 0
-      if mode == 1 then
-         return table.Random(ttt_playercolors.serious)
-      elseif mode == 2 then
-         return table.Random(ttt_playercolors.all)
-      elseif mode == 3 then
-         -- Full randomness
-         return Color(math.random(0, 255), math.random(0, 255), math.random(0, 255))
-      end
+   local mode = GetConVarNumber("ttt_playercolor_mode") or 0
+   if mode == 1 then
+      return table.Random(ttt_playercolors.serious)
+   elseif mode == 2 then
+      return table.Random(ttt_playercolors.all)
+   elseif mode == 3 then
+      -- Full randomness
+      return Color(math.random(0, 255), math.random(0, 255), math.random(0, 255))
    end
    -- No coloring
    return COLOR_WHITE
@@ -164,9 +156,27 @@ end
 
 -- Kill footsteps on player and client
 function GM:PlayerFootstep(ply, pos, foot, sound, volume, rf)
-   if IsValid(ply) and (ply:Crouching() or ply:GetMaxSpeed() < 150) then
+   if IsValid(ply) and (ply:Crouching() or ply:GetMaxSpeed() < 150 or ply:IsSpec()) then
       -- do not play anything, just prevent normal sounds from playing
       return true
+   end
+end
+
+-- Predicted move speed changes
+function GM:Move(ply, mv)
+   if ply:IsTerror() then
+      local basemul = 1
+      local slowed = false
+      -- Slow down ironsighters
+      local wep = ply:GetActiveWeapon()
+      if IsValid(wep) and wep.GetIronsights and wep:GetIronsights() then
+         basemul = 120 / 220
+         slowed = true
+      end
+      local mul = hook.Call("TTTPlayerSpeedModifier", GAMEMODE, ply, slowed, mv) or 1
+      mul = basemul * mul
+      mv:SetMaxClientSpeed(mv:GetMaxClientSpeed() * mul)
+      mv:SetMaxSpeed(mv:GetMaxSpeed() * mul)
    end
 end
 
