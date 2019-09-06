@@ -2,9 +2,33 @@
 local PANEL = {}
 
 function PANEL:Init()
+	local TextEdit = vgui.Create( "DTextEntry", self )
+	TextEdit:SetVisible(false)
+	TextEdit:Dock( FILL )
+	TextEdit:SetText( self:GetText() )
+	TextEdit:SetFont( self:GetFont() )
+	
+	TextEdit.OnEnter = function()
+
+		local text = self:OnLabelTextChanged( TextEdit:GetText() ) or TextEdit:GetText()
+		if ( text:byte() == 35 ) then text = "#" .. text end -- Hack!
+		self:SetText( text )
+		hook.Run( "OnTextEntryLoseFocus", TextEdit )
+		TextEdit:SetVisible(false)
+
+	end
+
+	TextEdit.OnLoseFocus = function()
+
+		hook.Run( "OnTextEntryLoseFocus", TextEdit )
+		TextEdit:SetVisible(false)
+
+	end
+	
+	self.textbox = TextEdit
 end
 
-function PANEL:GetDTextEntry()
+function PANEL:GetTextEntry()
 	return self.textbox
 end
 
@@ -16,34 +40,11 @@ function PANEL:SizeToContents()
 end
 
 function PANEL:DoDoubleClick()
-
-	local TextEdit = vgui.Create( "DTextEntry", self )
-	TextEdit:Dock( FILL )
-	TextEdit:SetText( self:GetText() )
-	TextEdit:SetFont( self:GetFont() )
-
-	TextEdit.OnEnter = function()
-
-		local text = self:OnLabelTextChanged( TextEdit:GetText() ) or TextEdit:GetText()
-		if ( text:byte() == 35 ) then text = "#" .. text end -- Hack!
-		self:SetText( text )
-		hook.Run( "OnTextEntryLoseFocus", TextEdit )
-		TextEdit:Remove()
-
-	end
-
-	TextEdit.OnLoseFocus = function()
-
-		hook.Run( "OnTextEntryLoseFocus", TextEdit )
-		TextEdit:Remove()
-
-	end
-
-	TextEdit:RequestFocus()
-	TextEdit:OnGetFocus() -- Because the keyboard input might not be enabled yet! (spawnmenu)
-	TextEdit:SelectAllText( true )
-
-	self.textbox = TextEdit
+	self.textbox:SetVisible(true)
+	self.textbox:SetText(self:GetText())
+	self.textbox:RequestFocus()
+	self.textbox:OnGetFocus()
+	self.textbox:SelectAllText(true)
 end
 
 function PANEL:OnLabelTextChanged( text )
